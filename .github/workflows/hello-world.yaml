@@ -1,33 +1,27 @@
 name: JAVA CI
 on: push
+env:
+  docker_username: ${{ github.actor }}
+  docker_password: ${{ secrets.GITHUB_TOKEN }}
+  GIT_COMMIT: ${{ github.sha }}
 jobs:
-  clone:
-    name: Clone down
+  build:
+    name: Build
     runs-on: ubuntu-latest
+    container: gradle:6-jdk11
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
-      - name: Upload repo
+      - name: Build the app
+        run: chmod +x ci/build-app.sh && ci/build-app.sh
+      - name: Build upload
         uses: actions/upload-artifact@v3
         with:
           name: code
           path: .
-  build:
-    name: Build
-    needs: [clone]
-    runs-on: ubuntu-latest
-    container: gradle:6-jdk11
-    steps:
-      - name: Download repo
-        uses: actions/download-artifact@v3
-        with:
-          name: code
-          path: .
-      - name: Build the app
-        run: chmod +x ci/build-app.sh && ci/build-app.sh
   test:
     name: Test
-    needs: [clone]
+    needs: [build]
     runs-on: ubuntu-latest
     container: gradle:6-jdk11
     steps:
@@ -38,3 +32,19 @@ jobs:
           path: .
       - name: Run tests
         run: chmod +x ci/unit-test-app.sh && ci/unit-test-app.sh
+  docker:
+    name: Docker
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Download repo
+        uses: actions/download-artifact@v3
+        with:
+          name: code
+          path: .
+      - name: Build docker
+        run: chmod +x ci/build-docker.sh && ci/build-docker.sh
+      - name: Push docker
+        run: chmod +x ci/push-docker.sh && ci/push-docker.sh
